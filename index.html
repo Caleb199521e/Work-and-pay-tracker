@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Work & Pay Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-green: #10B981;
+            --dark-green: #059669;
+            --light-green: #D1FAE5;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f9fafb;
+        }
+        
+        .progress-bar {
+            transition: width 0.5s ease-in-out;
+        }
+        
+        .modal {
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+        
+        .modal.hidden {
+            opacity: 0;
+            transform: scale(0.9);
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gray-50">
+    <!-- Login Page -->
+    <div id="login-page" class="min-h-screen flex items-center justify-center p-4">
+        <div class="bg-white p-8 rounded-2xl shadow-md w-full max-w-md">
+            <div class="text-center mb-8">
+                <h1 class="text-3xl font-bold text-gray-800">Work & Pay Tracker</h1>
+                <p class="text-gray-600 mt-2">Track your car payments</p>
+            </div>
+            <form id="login-form" class="space-y-6">
+                <div>
+                    <label for="username" class="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                    <input type="text" id="username" required 
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                </div>
+                <div>
+                    <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                    <input type="password" id="password" required 
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                </div>
+                <button type="submit" 
+                        class="w-full bg-green-500 text-white py-2 px-4 rounded-lg hover:bg-green-600 transition duration-200 font-medium">
+                    Sign In
+                </button>
+            </form>
+            <!-- <div class="mt-6 text-center text-sm text-gray-500">
+                <p>Default credentials: username: caleb, password: 1234</p>
+            </div> -->
+        </div>
+    </div>
+
+    <!-- Dashboard -->
+    <div id="dashboard" class="hidden min-h-screen p-4">
+        <header class="max-w-4xl mx-auto mb-8">
+            <div class="flex justify-between items-center">
+                <h1 class="text-2xl font-bold text-gray-800">Work & Pay Tracker</h1>
+                <button id="logout-btn" 
+                        class="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium">
+                    Logout
+                </button>
+            </div>
+        </header>
+
+        <main class="max-w-4xl mx-auto">
+            <!-- Stats Section -->
+            <div class="bg-white rounded-2xl shadow-md p-6 mb-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                    <div class="text-center p-4 bg-gray-50 rounded-lg">
+                        <p class="text-sm text-gray-500">Total Amount</p>
+                        <p class="text-2xl font-bold text-gray-800" id="total-amount">₵62,000</p>
+                    </div>
+                    <div class="text-center p-4 bg-green-50 rounded-lg">
+                        <p class="text-sm text-gray-500">Amount Paid</p>
+                        <p class="text-2xl font-bold text-green-600" id="amount-paid">₵1,000</p>
+                    </div>
+                    <div class="text-center p-4 bg-red-50 rounded-lg">
+                        <p class="text-sm text-gray-500">Balance Remaining</p>
+                        <p class="text-2xl font-bold text-red-600" id="balance-remaining">₵61,000</p>
+                    </div>
+                </div>
+
+                <!-- Progress Bar -->
+                <div class="mb-2">
+                    <div class="flex justify-between text-sm text-gray-600 mb-1">
+                        <span>Payment Progress</span>
+                        <span id="progress-percent">1.61%</span>
+                    </div>
+                    <div class="h-4 bg-gray-200 rounded-full overflow-hidden">
+                        <div id="progress-bar" class="h-full bg-green-500 progress-bar" style="width: 1.61%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Actions Section -->
+            <div class="flex flex-wrap gap-4 mb-6">
+                <button id="add-payment-btn" 
+                        class="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition duration-200 font-medium">
+                    Add Payment
+                </button>
+                <button id="export-csv-btn" 
+                        class="bg-white text-gray-700 border border-gray-300 px-6 py-3 rounded-lg hover:bg-gray-50 transition duration-200 font-medium">
+                    Export CSV
+                </button>
+            </div>
+
+            <!-- Payments Table -->
+            <div class="bg-white rounded-2xl shadow-md overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h2 class="text-lg font-semibold text-gray-800">Payment History</h2>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cumulative Total</th>
+                            </tr>
+                        </thead>
+                        <tbody id="payments-table-body" class="bg-white divide-y divide-gray-200">
+                            <!-- Payments will be populated here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Add Payment Modal -->
+    <div id="add-payment-modal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h2 class="text-xl font-semibold text-gray-800">Add New Payment</h2>
+            </div>
+            <form id="payment-form" class="p-6 space-y-4">
+                <div>
+                    <label for="payment-amount" class="block text-sm font-medium text-gray-700 mb-1">Amount (₵)</label>
+                    <input type="number" id="payment-amount" required min="1" 
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                </div>
+                <div>
+                    <label for="payment-date" class="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                    <input type="date" id="payment-date" required 
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                </div>
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button type="button" id="cancel-payment-btn" 
+                            class="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium">
+                        Cancel
+                    </button>
+                    <button type="submit" 
+                            class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition duration-200 font-medium">
+                        Add Payment
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // App state
+        let appState = {
+            user: null,
+            payments: [],
+            totalAmount: 62000
+        };
+
+        // DOM Elements
+        const loginPage = document.getElementById('login-page');
+        const dashboard = document.getElementById('dashboard');
+        const loginForm = document.getElementById('login-form');
+        const logoutBtn = document.getElementById('logout-btn');
+        const addPaymentBtn = document.getElementById('add-payment-btn');
+        const exportCsvBtn = document.getElementById('export-csv-btn');
+        const paymentModal = document.getElementById('add-payment-modal');
+        const paymentForm = document.getElementById('payment-form');
+        const cancelPaymentBtn = document.getElementById('cancel-payment-btn');
+        const paymentsTableBody = document.getElementById('payments-table-body');
+        
+        // Display elements
+        const totalAmountEl = document.getElementById('total-amount');
+        const amountPaidEl = document.getElementById('amount-paid');
+        const balanceRemainingEl = document.getElementById('balance-remaining');
+        const progressBarEl = document.getElementById('progress-bar');
+        const progressPercentEl = document.getElementById('progress-percent');
+
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', () => {
+            // Check if user is already logged in
+            const savedUser = localStorage.getItem('currentUser');
+            if (savedUser) {
+                appState.user = JSON.parse(savedUser);
+                loadAppData();
+                showDashboard();
+            }
+
+            // Set today's date as default in payment form
+            document.getElementById('payment-date').valueAsDate = new Date();
+
+            // Event listeners
+            loginForm.addEventListener('submit', handleLogin);
+            logoutBtn.addEventListener('click', handleLogout);
+            addPaymentBtn.addEventListener('click', showPaymentModal);
+            cancelPaymentBtn.addEventListener('click', hidePaymentModal);
+            paymentForm.addEventListener('submit', handleAddPayment);
+            exportCsvBtn.addEventListener('click', exportToCsv);
+        });
+
+        // Login handler
+        function handleLogin(e) {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            // Check credentials (in a real app, this would be server-side)
+            const savedUser = localStorage.getItem('user');
+            if (savedUser) {
+                const userData = JSON.parse(savedUser);
+                if (username === userData.username && password === userData.password) {
+                    appState.user = userData;
+                    localStorage.setItem('currentUser', JSON.stringify(userData));
+                    loadAppData();
+                    showDashboard();
+                } else {
+                    alert('Invalid username or password');
+                }
+            } else {
+                // First time setup - create default user
+                const defaultUser = { username: 'caleb', password: '1234' };
+                localStorage.setItem('user', JSON.stringify(defaultUser));
+                localStorage.setItem('currentUser', JSON.stringify(defaultUser));
+                appState.user = defaultUser;
+                
+                // Initialize with sample payment
+                const initialPayment = [{ date: new Date().toISOString().split('T')[0], amount: 1000 }];
+                localStorage.setItem('payments', JSON.stringify(initialPayment));
+                localStorage.setItem('totalAmount', '62000');
+                
+                loadAppData();
+                showDashboard();
+            }
+        }
+
+        // Logout handler
+        function handleLogout() {
+            localStorage.removeItem('currentUser');
+            appState.user = null;
+            showLogin();
+        }
+
+        // Show dashboard
+        function showDashboard() {
+            loginPage.classList.add('hidden');
+            dashboard.classList.remove('hidden');
+            updateDashboard();
+        }
+
+        // Show login
+        function showLogin() {
+            dashboard.classList.add('hidden');
+            loginPage.classList.remove('hidden');
+        }
+
+        // Load app data from localStorage
+        function loadAppData() {
+            const savedPayments = localStorage.getItem('payments');
+            const savedTotalAmount = localStorage.getItem('totalAmount');
+            
+            if (savedPayments) {
+                appState.payments = JSON.parse(savedPayments);
+            }
+            
+            if (savedTotalAmount) {
+                appState.totalAmount = parseInt(savedTotalAmount);
+            }
+        }
+
+        // Update dashboard with current data
+        function updateDashboard() {
+            // Calculate totals
+            const totalPaid = appState.payments.reduce((sum, payment) => sum + payment.amount, 0);
+            const balance = appState.totalAmount - totalPaid;
+            const progressPercent = (totalPaid / appState.totalAmount) * 100;
+            
+            // Update display
+            totalAmountEl.textContent = formatCurrency(appState.totalAmount);
+            amountPaidEl.textContent = formatCurrency(totalPaid);
+            balanceRemainingEl.textContent = formatCurrency(balance);
+            progressBarEl.style.width = `${progressPercent}%`;
+            progressPercentEl.textContent = `${progressPercent.toFixed(2)}%`;
+            
+            // Update payments table
+            updatePaymentsTable();
+        }
+
+        // Format currency with commas
+        function formatCurrency(amount) {
+            return `₵${amount.toLocaleString()}`;
+        }
+
+        // Update payments table
+        function updatePaymentsTable() {
+            paymentsTableBody.innerHTML = '';
+            
+            if (appState.payments.length === 0) {
+                paymentsTableBody.innerHTML = `
+                    <tr>
+                        <td colspan="3" class="px-6 py-4 text-center text-gray-500">
+                            No payments recorded yet
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            let cumulativeTotal = 0;
+            
+            appState.payments.forEach(payment => {
+                cumulativeTotal += payment.amount;
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${formatDate(payment.date)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${formatCurrency(payment.amount)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${formatCurrency(cumulativeTotal)}</td>
+                `;
+                paymentsTableBody.appendChild(row);
+            });
+        }
+
+        // Format date for display
+        function formatDate(dateString) {
+            const options = { year: 'numeric', month: 'short', day: 'numeric' };
+            return new Date(dateString).toLocaleDateString(undefined, options);
+        }
+
+        // Show payment modal
+        function showPaymentModal() {
+            paymentModal.classList.remove('hidden');
+        }
+
+        // Hide payment modal
+        function hidePaymentModal() {
+            paymentModal.classList.add('hidden');
+            paymentForm.reset();
+            // Reset date to today
+            document.getElementById('payment-date').valueAsDate = new Date();
+        }
+
+        // Handle adding a new payment
+        function handleAddPayment(e) {
+            e.preventDefault();
+            
+            const amount = parseInt(document.getElementById('payment-amount').value);
+            const date = document.getElementById('payment-date').value;
+            
+            if (amount <= 0) {
+                alert('Please enter a valid payment amount');
+                return;
+            }
+            
+            // Add new payment
+            appState.payments.push({ date, amount });
+            
+            // Save to localStorage
+            localStorage.setItem('payments', JSON.stringify(appState.payments));
+            
+            // Update UI
+            updateDashboard();
+            hidePaymentModal();
+            
+            // Show success message
+            alert(`Payment of ${formatCurrency(amount)} recorded successfully!`);
+        }
+
+        // Export to CSV
+        function exportToCsv() {
+            if (appState.payments.length === 0) {
+                alert('No payment data to export');
+                return;
+            }
+            
+            let csvContent = "Date,Amount,Cumulative Total\n";
+            let cumulativeTotal = 0;
+            
+            appState.payments.forEach(payment => {
+                cumulativeTotal += payment.amount;
+                csvContent += `${payment.date},${payment.amount},${cumulativeTotal}\n`;
+            });
+            
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'payment-history.csv';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
