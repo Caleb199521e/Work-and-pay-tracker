@@ -129,6 +129,8 @@
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cumulative Total</th>
+                                <!-- Added Actions column -->
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="payments-table-body" class="bg-white divide-y divide-gray-200">
@@ -144,9 +146,12 @@
     <div id="add-payment-modal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 hidden">
         <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
             <div class="px-6 py-4 border-b border-gray-200">
-                <h2 class="text-xl font-semibold text-gray-800">Add New Payment</h2>
+                <!-- Modal title is now dynamic -->
+                <h2 id="modal-title" class="text-xl font-semibold text-gray-800">Add New Payment</h2>
             </div>
             <form id="payment-form" class="p-6 space-y-4">
+                <!-- hidden index for edit mode -->
+                <input type="hidden" id="payment-index" value="">
                 <div>
                     <label for="payment-amount" class="block text-sm font-medium text-gray-700 mb-1">Amount (₵)</label>
                     <input type="number" id="payment-amount" required min="1" 
@@ -162,7 +167,8 @@
                             class="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium">
                         Cancel
                     </button>
-                    <button type="submit" 
+                    <!-- submit button text is dynamic -->
+                    <button type="submit" id="modal-submit-btn"
                             class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition duration-200 font-medium">
                         Add Payment
                     </button>
@@ -198,6 +204,11 @@
         const progressBarEl = document.getElementById('progress-bar');
         const progressPercentEl = document.getElementById('progress-percent');
 
+        // modal elements
+        const modalTitleEl = document.getElementById('modal-title');
+        const modalSubmitBtn = document.getElementById('modal-submit-btn');
+        const paymentIndexEl = document.getElementById('payment-index');
+
         // Initialize app
         document.addEventListener('DOMContentLoaded', () => {
             // Check if user is already logged in
@@ -214,9 +225,10 @@
             // Event listeners
             loginForm.addEventListener('submit', handleLogin);
             logoutBtn.addEventListener('click', handleLogout);
-            addPaymentBtn.addEventListener('click', showPaymentModal);
+            // use wrapper so showPaymentModal can be called without an event object for add-mode
+            addPaymentBtn.addEventListener('click', () => showPaymentModal());
             cancelPaymentBtn.addEventListener('click', hidePaymentModal);
-            paymentForm.addEventListener('submit', handleAddPayment);
+            paymentForm.addEventListener('submit', handleAddOrEditPayment);
             exportCsvBtn.addEventListener('click', exportToCsv);
         });
 
@@ -319,7 +331,7 @@
             if (appState.payments.length === 0) {
                 paymentsTableBody.innerHTML = `
                     <tr>
-                        <td colspan="3" class="px-6 py-4 text-center text-gray-500">
+                        <td colspan="4" class="px-6 py-4 text-center text-gray-500">
                             No payments recorded yet
                         </td>
                     </tr>
@@ -329,16 +341,45 @@
             
             let cumulativeTotal = 0;
             
-            appState.payments.forEach(payment => {
+            appState.payments.forEach((payment, index) => {
                 cumulativeTotal += payment.amount;
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${formatDate(payment.date)}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${formatCurrency(payment.amount)}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${formatCurrency(cumulativeTotal)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
+                        <button data-index="${index}" class="edit-btn text-sm text-blue-600 hover:underline mr-3">Edit</button>
+                        <button data-index="${index}" class="delete-btn text-sm text-red-600 hover:underline">Delete</button>
+                    </td>
                 `;
                 paymentsTableBody.appendChild(row);
             });
+
+            // Attach event listeners for edit and delete buttons
+            document.querySelectorAll('.edit-btn').forEach(btn => {
+                btn.addEventListener('click', (ev) => {
+                    const idx = parseInt(ev.currentTarget.getAttribute('data-index'));
+                    showPaymentModal(idx);
+                });
+            });
+            document.querySelectorAll('.delete-btn').forEach(btn => {
+                btn.addEventListener('click', (ev) => {
+                    const idx = parseInt(ev.currentTarget.getAttribute('data-index'));
+                    handleDeletePayment(idx);
+                });
+            });
+        }
+
+        // Delete payment with confirmation
+        function handleDeletePayment(index) {
+            if (!Number.isInteger(index) || index < 0 || index >= appState.payments.length) return;
+            const payment = appState.payments[index];
+            const confirmed = confirm(`Delete payment of ${formatCurrency(payment.amount)} on ${formatDate(payment.date)}? This cannot be undone.`);
+            if (!confirmed) return;
+            appState.payments.splice(index, 1);
+            localStorage.setItem('payments', JSON.stringify(appState.payments));
+            updateDashboard();
         }
 
         // Format date for display
@@ -347,8 +388,29 @@
             return new Date(dateString).toLocaleDateString(undefined, options);
         }
 
-        // Show payment modal
-        function showPaymentModal() {
+        // Show payment modal (index optional for edit)
+        function showPaymentModal(index) {
+            // if called as an event handler accidentally, ensure index is undefined
+            if (typeof index === 'object') index = undefined;
+
+            if (typeof index === 'number') {
+                // edit mode
+                const payment = appState.payments[index];
+                if (!payment) return;
+                document.getElementById('payment-amount').value = payment.amount;
+                document.getElementById('payment-date').value = payment.date;
+                paymentIndexEl.value = index;
+                modalTitleEl.textContent = 'Edit Payment';
+                modalSubmitBtn.textContent = 'Save Changes';
+            } else {
+                // add mode
+                paymentIndexEl.value = '';
+                document.getElementById('payment-amount').value = '';
+                document.getElementById('payment-date').valueAsDate = new Date();
+                modalTitleEl.textContent = 'Add New Payment';
+                modalSubmitBtn.textContent = 'Add Payment';
+            }
+
             paymentModal.classList.remove('hidden');
         }
 
@@ -358,23 +420,30 @@
             paymentForm.reset();
             // Reset date to today
             document.getElementById('payment-date').valueAsDate = new Date();
+            paymentIndexEl.value = '';
         }
 
-        // Handle adding a new payment
-        function handleAddPayment(e) {
+        // Handle adding or editing a payment
+        function handleAddOrEditPayment(e) {
             e.preventDefault();
             
             const amount = parseInt(document.getElementById('payment-amount').value);
             const date = document.getElementById('payment-date').value;
-            
-            if (amount <= 0) {
+            const editIndex = paymentIndexEl.value !== '' ? parseInt(paymentIndexEl.value) : null;
+
+            if (isNaN(amount) || amount <= 0) {
                 alert('Please enter a valid payment amount');
                 return;
             }
-            
-            // Add new payment
-            appState.payments.push({ date, amount });
-            
+
+            if (editIndex !== null && Number.isInteger(editIndex)) {
+                // update existing
+                appState.payments[editIndex] = { date, amount };
+            } else {
+                // add new payment
+                appState.payments.push({ date, amount });
+            }
+
             // Save to localStorage
             localStorage.setItem('payments', JSON.stringify(appState.payments));
             
@@ -383,7 +452,11 @@
             hidePaymentModal();
             
             // Show success message
-            alert(`Payment of ${formatCurrency(amount)} recorded successfully!`);
+            if (editIndex !== null) {
+                alert(`Payment updated to ${formatCurrency(amount)}`);
+            } else {
+                alert(`Payment of ${formatCurrency(amount)} recorded successfully!`);
+            }
         }
 
         // Export to CSV
