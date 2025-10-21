@@ -204,402 +204,400 @@
     </div>
 
     <script>
-        // App state
-        let appState = {
-            user: null,
-            payments: [],
-            totalAmount: 62000
-        };
+	// App state
+	let appState = {
+		user: null,
+		payments: [],
+		totalAmount: 62000
+	};
 
-        // DOM Elements
-        const loginPage = document.getElementById('login-page');
-        const dashboard = document.getElementById('dashboard');
-        const loginForm = document.getElementById('login-form');
-        const logoutBtn = document.getElementById('logout-btn');
-        const addPaymentBtn = document.getElementById('add-payment-btn');
-        const exportCsvBtn = document.getElementById('export-csv-btn');
-        const paymentModal = document.getElementById('add-payment-modal');
-        const paymentForm = document.getElementById('payment-form');
-        const cancelPaymentBtn = document.getElementById('cancel-payment-btn');
-        const paymentsTableBody = document.getElementById('payments-table-body');
+	// DOM Elements
+	const loginPage = document.getElementById('login-page');
+	const dashboard = document.getElementById('dashboard');
+	const loginForm = document.getElementById('login-form');
+	const logoutBtn = document.getElementById('logout-btn');
+	const addPaymentBtn = document.getElementById('add-payment-btn');
+	const exportCsvBtn = document.getElementById('export-csv-btn');
+	const paymentModal = document.getElementById('add-payment-modal');
+	const paymentForm = document.getElementById('payment-form');
+	const cancelPaymentBtn = document.getElementById('cancel-payment-btn');
+	const paymentsTableBody = document.getElementById('payments-table-body');
 
-        // Auth UI elements
-        const showSignupBtn = document.getElementById('show-signup');
-        const signupForm = document.getElementById('signup-form');
-        const signupBackBtn = document.getElementById('signup-back');
-        const signupSubmitBtn = document.getElementById('signup-submit');
+	// Auth UI elements
+	const showSignupBtn = document.getElementById('show-signup');
+	const signupForm = document.getElementById('signup-form');
+	const signupBackBtn = document.getElementById('signup-back');
+	const signupSubmitBtn = document.getElementById('signup-submit');
 
-        // Display elements
-        const totalAmountEl = document.getElementById('total-amount');
-        const amountPaidEl = document.getElementById('amount-paid');
-        const balanceRemainingEl = document.getElementById('balance-remaining');
-        const progressBarEl = document.getElementById('progress-bar');
-        const progressPercentEl = document.getElementById('progress-percent');
+	// Display elements
+	const totalAmountEl = document.getElementById('total-amount');
+	const amountPaidEl = document.getElementById('amount-paid');
+	const balanceRemainingEl = document.getElementById('balance-remaining');
+	const progressBarEl = document.getElementById('progress-bar');
+	const progressPercentEl = document.getElementById('progress-percent');
 
-        // modal elements
-        const modalTitleEl = document.getElementById('modal-title');
-        const modalSubmitBtn = document.getElementById('modal-submit-btn');
-        const paymentIndexEl = document.getElementById('payment-index');
+	// modal elements
+	const modalTitleEl = document.getElementById('modal-title');
+	const modalSubmitBtn = document.getElementById('modal-submit-btn');
+	const paymentIndexEl = document.getElementById('payment-index');
 
-        // Utility: users map stored in localStorage as JSON object { username: { password, totalAmount } }
-        function getUsers() {
-            const raw = localStorage.getItem('users');
-            return raw ? JSON.parse(raw) : {};
-        }
-        function saveUsers(users) {
-            localStorage.setItem('users', JSON.stringify(users));
-        }
+	// Utility: users map stored in localStorage as JSON object { username: { password, totalAmount } }
+	function getUsers() {
+		const raw = localStorage.getItem('users');
+		return raw ? JSON.parse(raw) : {};
+	}
+	function saveUsers(users) {
+		localStorage.setItem('users', JSON.stringify(users));
+	}
 
-        // Initialize app
-        document.addEventListener('DOMContentLoaded', () => {
-            // restore currentUser (support both legacy object and new string)
-            const savedUserRaw = localStorage.getItem('currentUser');
-            if (savedUserRaw) {
-                try {
-                    const parsed = JSON.parse(savedUserRaw);
-                    if (parsed && typeof parsed === 'object' && parsed.username) {
-                        appState.user = parsed.username;
-                    } else if (typeof parsed === 'string') {
-                        appState.user = parsed;
-                    }
-                } catch (e) {
-                    // fallback: assume string
-                    appState.user = savedUserRaw;
-                }
-            }
+	// helper to get today's date in YYYY-MM-DD
+	function getTodayISO() {
+		return new Date().toISOString().split('T')[0];
+	}
 
-            if (appState.user) {
-                loadAppData();
-                showDashboard();
-            }
+	// Initialize app
+	document.addEventListener('DOMContentLoaded', () => {
+		// restore currentUser (stored as string)
+		const savedUserRaw = localStorage.getItem('currentUser');
+		if (savedUserRaw) {
+			try {
+				const parsed = JSON.parse(savedUserRaw);
+				if (typeof parsed === 'string') appState.user = parsed;
+			} catch {
+				appState.user = savedUserRaw;
+			}
+		}
 
-            // Set today's date as default in payment form
-            document.getElementById('payment-date').valueAsDate = new Date();
+		if (appState.user) {
+			loadAppData();
+			showDashboard();
+		}
 
-            // Event listeners
-            loginForm.addEventListener('submit', handleLogin);
-            logoutBtn.addEventListener('click', handleLogout);
-            addPaymentBtn.addEventListener('click', () => showPaymentModal());
-            cancelPaymentBtn.addEventListener('click', hidePaymentModal);
-            paymentForm.addEventListener('submit', handleAddOrEditPayment);
-            exportCsvBtn.addEventListener('click', exportToCsv);
+		// Set today's date as default in payment form and prevent future dates
+		const paymentDateInput = document.getElementById('payment-date');
+		paymentDateInput.valueAsDate = new Date();
+		paymentDateInput.max = getTodayISO();
 
-            // Auth UI
-            if (showSignupBtn) showSignupBtn.addEventListener('click', () => toggleAuthForms(true));
-            if (signupBackBtn) signupBackBtn.addEventListener('click', () => toggleAuthForms(false));
-            if (signupForm) signupForm.addEventListener('submit', handleSignup);
-        });
+		// Event listeners
+		loginForm.addEventListener('submit', handleLogin);
+		logoutBtn.addEventListener('click', handleLogout);
+		addPaymentBtn.addEventListener('click', () => showPaymentModal());
+		cancelPaymentBtn.addEventListener('click', hidePaymentModal);
+		paymentForm.addEventListener('submit', handleAddOrEditPayment);
+		exportCsvBtn.addEventListener('click', exportToCsv);
 
-        // Toggle between login and signup forms
-        function toggleAuthForms(showSignup) {
-            // loginForm is visible by default; signupForm has class 'hidden'
-            if (showSignup) {
-                loginForm.classList.add('hidden');
-                document.getElementById('auth-switch').classList.add('hidden');
-                signupForm.classList.remove('hidden');
-            } else {
-                signupForm.classList.add('hidden');
-                loginForm.classList.remove('hidden');
-                document.getElementById('auth-switch').classList.remove('hidden');
-            }
-        }
+		// Auth UI
+		if (showSignupBtn) showSignupBtn.addEventListener('click', () => toggleAuthForms(true));
+		if (signupBackBtn) signupBackBtn.addEventListener('click', () => toggleAuthForms(false));
+		if (signupForm) signupForm.addEventListener('submit', handleSignup);
+	});
 
-        // Login handler
-        function handleLogin(e) {
-            e.preventDefault();
-            const username = document.getElementById('username').value.trim();
-            const password = document.getElementById('password').value;
+	// Toggle between login and signup forms
+	function toggleAuthForms(showSignup) {
+		if (showSignup) {
+			loginForm.classList.add('hidden');
+			document.getElementById('auth-switch').classList.add('hidden');
+			signupForm.classList.remove('hidden');
+		} else {
+			signupForm.classList.add('hidden');
+			loginForm.classList.remove('hidden');
+			document.getElementById('auth-switch').classList.remove('hidden');
+		}
+	}
 
-            const users = getUsers();
-            if (users[username] && users[username].password === password) {
-                appState.user = username;
-                localStorage.setItem('currentUser', JSON.stringify(username));
-                loadAppData();
-                showDashboard();
-            } else {
-                alert('Invalid username or password. Or create a new account.');
-            }
-        }
+	// Login handler
+	function handleLogin(e) {
+		e.preventDefault();
+		const username = document.getElementById('username').value.trim();
+		const password = document.getElementById('password').value;
 
-        // Signup handler
-        function handleSignup(e) {
-            e.preventDefault();
-            const username = document.getElementById('signup-username').value.trim();
-            const password = document.getElementById('signup-password').value;
-            const confirmPassword = document.getElementById('signup-password-confirm').value;
-            const totalAmountInput = parseInt(document.getElementById('signup-total-amount').value);
+		const users = getUsers();
+		if (users[username] && users[username].password === password) {
+			appState.user = username;
+			localStorage.setItem('currentUser', JSON.stringify(username));
+			loadAppData();
+			showDashboard();
+		} else {
+			alert('Invalid username or password. Or create a new account.');
+		}
+	}
 
-            if (!username) { alert('Enter a username'); return; }
-            if (password.length < 1) { alert('Enter a password'); return; }
-            if (password !== confirmPassword) { alert('Passwords do not match'); return; }
-            if (isNaN(totalAmountInput) || totalAmountInput <= 0) { alert('Enter a valid total amount'); return; }
+	// Signup handler
+	function handleSignup(e) {
+		e.preventDefault();
+		const username = document.getElementById('signup-username').value.trim();
+		const password = document.getElementById('signup-password').value;
+		const confirmPassword = document.getElementById('signup-password-confirm').value;
+		const totalAmountInput = parseInt(document.getElementById('signup-total-amount').value, 10);
 
-            const users = getUsers();
-            if (users[username]) {
-                alert('Username already exists. Please choose another.');
-                return;
-            }
+		if (!username) { alert('Enter a username'); return; }
+		if (password.length < 1) { alert('Enter a password'); return; }
+		if (password !== confirmPassword) { alert('Passwords do not match'); return; }
+		if (isNaN(totalAmountInput) || totalAmountInput <= 0) { alert('Enter a valid total amount'); return; }
 
-            // create user
-            users[username] = { password, totalAmount: totalAmountInput };
-            saveUsers(users);
+		const users = getUsers();
+		if (users[username]) {
+			alert('Username already exists. Please choose another.');
+			return;
+		}
 
-            // initialize user payments and totalAmount under per-user keys
-            localStorage.setItem(`payments_${username}`, JSON.stringify([]));
-            localStorage.setItem(`totalAmount_${username}`, String(totalAmountInput));
+		// create user
+		users[username] = { password, totalAmount: totalAmountInput };
+		saveUsers(users);
 
-            // start session
-            appState.user = username;
-            localStorage.setItem('currentUser', JSON.stringify(username));
-            loadAppData();
-            toggleAuthForms(false);
-            showDashboard();
-        }
+		// initialize user payments and totalAmount under per-user keys
+		localStorage.setItem(`payments_${username}`, JSON.stringify([]));
+		localStorage.setItem(`totalAmount_${username}`, String(totalAmountInput));
 
-        // Logout handler
-        function handleLogout() {
-            localStorage.removeItem('currentUser');
-            appState.user = null;
-            showLogin();
-        }
+		// start session
+		appState.user = username;
+		localStorage.setItem('currentUser', JSON.stringify(username));
+		loadAppData();
+		toggleAuthForms(false);
+		showDashboard();
+	}
 
-        // Show dashboard
-        function showDashboard() {
-            loginPage.classList.add('hidden');
-            dashboard.classList.remove('hidden');
-            updateDashboard();
-        }
+	// Logout handler
+	function handleLogout() {
+		localStorage.removeItem('currentUser');
+		appState.user = null;
+		showLogin();
+	}
 
-        // Show login
-        function showLogin() {
-            dashboard.classList.add('hidden');
-            loginPage.classList.remove('hidden');
-        }
+	// Show dashboard
+	function showDashboard() {
+		loginPage.classList.add('hidden');
+		dashboard.classList.remove('hidden');
+		updateDashboard();
+	}
 
-        // Load app data from localStorage for current user
-        function loadAppData() {
-            if (!appState.user) return;
+	// Show login
+	function showLogin() {
+		dashboard.classList.add('hidden');
+		loginPage.classList.remove('hidden');
+	}
 
-            // Try per-user keys
-            const paymentsKey = `payments_${appState.user}`;
-            const totalKey = `totalAmount_${appState.user}`;
+	// Load app data from localStorage for current user
+	function loadAppData() {
+		if (!appState.user) return;
 
-            const savedPayments = localStorage.getItem(paymentsKey);
-            const savedTotalAmount = localStorage.getItem(totalKey);
+		const paymentsKey = `payments_${appState.user}`;
+		const totalKey = `totalAmount_${appState.user}`;
 
-            // Legacy fallback: if there is a generic 'payments' and current user is legacy user 'caleb', migrate
-            if (savedPayments) {
-                appState.payments = JSON.parse(savedPayments);
-            } else {
-                // no per-user payments: try legacy single payments key if present
-                const legacy = localStorage.getItem('payments');
-                appState.payments = legacy ? JSON.parse(legacy) : [];
-            }
+		const savedPayments = localStorage.getItem(paymentsKey);
+		const savedTotalAmount = localStorage.getItem(totalKey);
 
-            if (savedTotalAmount) {
-                appState.totalAmount = parseInt(savedTotalAmount);
-            } else {
-                // fallback to users map if present
-                const users = getUsers();
-                if (users[appState.user] && users[appState.user].totalAmount) {
-                    appState.totalAmount = parseInt(users[appState.user].totalAmount);
-                } else {
-                    // fallback to legacy single totalAmount
-                    const legacyTotal = localStorage.getItem('totalAmount');
-                    appState.totalAmount = legacyTotal ? parseInt(legacyTotal) : 62000;
-                }
-            }
-        }
+		if (savedPayments) {
+			appState.payments = JSON.parse(savedPayments);
+		} else {
+			const legacy = localStorage.getItem('payments');
+			appState.payments = legacy ? JSON.parse(legacy) : [];
+		}
 
-        // Save current user's payments/total
-        function saveUserData() {
-            if (!appState.user) return;
-            localStorage.setItem(`payments_${appState.user}`, JSON.stringify(appState.payments));
-            localStorage.setItem(`totalAmount_${appState.user}`, String(appState.totalAmount));
+		if (savedTotalAmount) {
+			appState.totalAmount = parseInt(savedTotalAmount, 10);
+		} else {
+			const users = getUsers();
+			if (users[appState.user] && users[appState.user].totalAmount) {
+				appState.totalAmount = parseInt(users[appState.user].totalAmount, 10);
+			} else {
+				const legacyTotal = localStorage.getItem('totalAmount');
+				appState.totalAmount = legacyTotal ? parseInt(legacyTotal, 10) : 62000;
+			}
+		}
+	}
 
-            // also update users map totalAmount (keeps source of truth for signup info)
-            const users = getUsers();
-            if (users[appState.user]) {
-                users[appState.user].totalAmount = appState.totalAmount;
-                saveUsers(users);
-            }
-        }
+	// Save current user's payments/total
+	function saveUserData() {
+		if (!appState.user) return;
+		localStorage.setItem(`payments_${appState.user}`, JSON.stringify(appState.payments));
+		localStorage.setItem(`totalAmount_${appState.user}`, String(appState.totalAmount));
 
-        // Update dashboard with current data
-        function updateDashboard() {
-            // Calculate totals
-            const totalPaid = appState.payments.reduce((sum, payment) => sum + payment.amount, 0);
-            const balance = appState.totalAmount - totalPaid;
-            const progressPercent = (totalPaid / appState.totalAmount) * 100;
-            
-            // Update display
-            totalAmountEl.textContent = formatCurrency(appState.totalAmount);
-            amountPaidEl.textContent = formatCurrency(totalPaid);
-            balanceRemainingEl.textContent = formatCurrency(balance);
-            progressBarEl.style.width = `${progressPercent}%`;
-            progressPercentEl.textContent = `${progressPercent.toFixed(2)}%`;
-            
-            // persist per-user data
-            saveUserData();
+		const users = getUsers();
+		if (users[appState.user]) {
+			users[appState.user].totalAmount = appState.totalAmount;
+			saveUsers(users);
+		}
+	}
 
-            // Update payments table
-            updatePaymentsTable();
-        }
+	// Update dashboard with current data
+	function updateDashboard() {
+		const totalPaid = appState.payments.reduce((sum, payment) => sum + payment.amount, 0);
+		const balance = appState.totalAmount - totalPaid;
+		const progressPercent = appState.totalAmount ? (totalPaid / appState.totalAmount) * 100 : 0;
 
-        // Format currency with commas
-        function formatCurrency(amount) {
-            return `₵${amount.toLocaleString()}`;
-        }
+		totalAmountEl.textContent = formatCurrency(appState.totalAmount);
+		amountPaidEl.textContent = formatCurrency(totalPaid);
+		balanceRemainingEl.textContent = formatCurrency(balance);
+		progressBarEl.style.width = `${Math.max(0, Math.min(100, progressPercent))}%`;
+		progressPercentEl.textContent = `${progressPercent.toFixed(2)}%`;
 
-        // Update payments table
-        function updatePaymentsTable() {
-            paymentsTableBody.innerHTML = '';
-            
-            if (appState.payments.length === 0) {
-                paymentsTableBody.innerHTML = `
-                    <tr>
-                        <td colspan="4" class="px-6 py-4 text-center text-gray-500">
-                            No payments recorded yet
-                        </td>
-                    </tr>
-                `;
-                return;
-            }
-            
-            let cumulativeTotal = 0;
-            
-            appState.payments.forEach((payment, index) => {
-                cumulativeTotal += payment.amount;
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${formatDate(payment.date)}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${formatCurrency(payment.amount)}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${formatCurrency(cumulativeTotal)}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
-                        <button data-index="${index}" class="edit-btn text-sm text-blue-600 hover:underline mr-3">Edit</button>
-                        <button data-index="${index}" class="delete-btn text-sm text-red-600 hover:underline">Delete</button>
-                    </td>
-                `;
-                paymentsTableBody.appendChild(row);
-            });
+		saveUserData();
+		updatePaymentsTable();
+	}
 
-            // Attach event listeners for edit and delete buttons
-            document.querySelectorAll('.edit-btn').forEach(btn => {
-                btn.addEventListener('click', (ev) => {
-                    const idx = parseInt(ev.currentTarget.getAttribute('data-index'));
-                    showPaymentModal(idx);
-                });
-            });
-            document.querySelectorAll('.delete-btn').forEach(btn => {
-                btn.addEventListener('click', (ev) => {
-                    const idx = parseInt(ev.currentTarget.getAttribute('data-index'));
-                    handleDeletePayment(idx);
-                });
-            });
-        }
+	// Format currency with commas
+	function formatCurrency(amount) {
+		return `₵${amount.toLocaleString()}`;
+	}
 
-        // Delete payment with confirmation
-        function handleDeletePayment(index) {
-            if (!Number.isInteger(index) || index < 0 || index >= appState.payments.length) return;
-            const payment = appState.payments[index];
-            const confirmed = confirm(`Delete payment of ${formatCurrency(payment.amount)} on ${formatDate(payment.date)}? This cannot be undone.`);
-            if (!confirmed) return;
-            appState.payments.splice(index, 1);
-            localStorage.setItem('payments', JSON.stringify(appState.payments));
-            updateDashboard();
-        }
+	// Update payments table
+	function updatePaymentsTable() {
+		paymentsTableBody.innerHTML = '';
 
-        // Format date for display
-        function formatDate(dateString) {
-            const options = { year: 'numeric', month: 'short', day: 'numeric' };
-            return new Date(dateString).toLocaleDateString(undefined, options);
-        }
+		if (!appState.payments || appState.payments.length === 0) {
+			paymentsTableBody.innerHTML = `
+				<tr>
+					<td colspan="4" class="px-6 py-4 text-center text-gray-500">
+						No payments recorded yet
+					</td>
+				</tr>
+			`;
+			return;
+		}
 
-        // Show payment modal (index optional for edit)
-        function showPaymentModal(index) {
-            // if called as an event handler accidentally, ensure index is undefined
-            if (typeof index === 'object') index = undefined;
+		let cumulativeTotal = 0;
 
-            if (typeof index === 'number') {
-                // edit mode
-                const payment = appState.payments[index];
-                if (!payment) return;
-                document.getElementById('payment-amount').value = payment.amount;
-                document.getElementById('payment-date').value = payment.date;
-                paymentIndexEl.value = index;
-                modalTitleEl.textContent = 'Edit Payment';
-                modalSubmitBtn.textContent = 'Save Changes';
-            } else {
-                // add mode
-                paymentIndexEl.value = '';
-                document.getElementById('payment-amount').value = '';
-                document.getElementById('payment-date').valueAsDate = new Date();
-                modalTitleEl.textContent = 'Add New Payment';
-                modalSubmitBtn.textContent = 'Add Payment';
-            }
+		appState.payments.forEach((payment, index) => {
+			cumulativeTotal += payment.amount;
+			const row = document.createElement('tr');
+			row.innerHTML = `
+				<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${formatDate(payment.date)}</td>
+				<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${formatCurrency(payment.amount)}</td>
+				<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${formatCurrency(cumulativeTotal)}</td>
+				<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
+					<button data-index="${index}" class="edit-btn text-sm text-blue-600 hover:underline mr-3">Edit</button>
+					<button data-index="${index}" class="delete-btn text-sm text-red-600 hover:underline">Delete</button>
+				</td>
+			`;
+			paymentsTableBody.appendChild(row);
+		});
 
-            paymentModal.classList.remove('hidden');
-        }
+		// Attach event listeners for edit and delete buttons
+		document.querySelectorAll('.edit-btn').forEach(btn => {
+			btn.addEventListener('click', (ev) => {
+				const idx = parseInt(ev.currentTarget.getAttribute('data-index'), 10);
+				showPaymentModal(idx);
+			});
+		});
+		document.querySelectorAll('.delete-btn').forEach(btn => {
+			btn.addEventListener('click', (ev) => {
+				const idx = parseInt(ev.currentTarget.getAttribute('data-index'), 10);
+				handleDeletePayment(idx);
+			});
+		});
+	}
 
-        // Hide payment modal
-        function hidePaymentModal() {
-            paymentModal.classList.add('hidden');
-            paymentForm.reset();
-            // Reset date to today
-            document.getElementById('payment-date').valueAsDate = new Date();
-        }
+	// Delete payment with confirmation
+	function handleDeletePayment(index) {
+		if (!Number.isInteger(index) || index < 0 || index >= appState.payments.length) return;
+		const payment = appState.payments[index];
+		const confirmed = confirm(`Delete payment of ${formatCurrency(payment.amount)} on ${formatDate(payment.date)}? This cannot be undone.`);
+		if (!confirmed) return;
+		appState.payments.splice(index, 1);
+		saveUserData();
+		updateDashboard();
+	}
 
-        // Handle adding a new payment
-        function handleAddOrEditPayment(e) {
-            e.preventDefault();
-            
-            const amount = parseInt(document.getElementById('payment-amount').value);
-            const date = document.getElementById('payment-date').value;
-            
-            if (amount <= 0) {
-                alert('Please enter a valid payment amount');
-                return;
-            }
-            
-            // Add new payment
-            appState.payments.push({ date, amount });
-            
-            // Save to localStorage
-            localStorage.setItem('payments', JSON.stringify(appState.payments));
-            
-            // Update UI
-            updateDashboard();
-            hidePaymentModal();
-            
-            // Show success message
-            alert(`Payment of ${formatCurrency(amount)} recorded successfully!`);
-        }
+	// Format date for display
+	function formatDate(dateString) {
+		const options = { year: 'numeric', month: 'short', day: 'numeric' };
+		return new Date(dateString).toLocaleDateString(undefined, options);
+	}
 
-        // Export to CSV
-        function exportToCsv() {
-            if (appState.payments.length === 0) {
-                alert('No payment data to export');
-                return;
-            }
-            
-            let csvContent = "Date,Amount,Cumulative Total\n";
-            let cumulativeTotal = 0;
-            
-            appState.payments.forEach(payment => {
-                cumulativeTotal += payment.amount;
-                csvContent += `${payment.date},${payment.amount},${cumulativeTotal}\n`;
-            });
-            
-            const blob = new Blob([csvContent], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'payment-history.csv';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }
-    </script>
+	// Show payment modal (index optional for edit)
+	function showPaymentModal(index) {
+		// if called as an event handler accidentally, ensure index is undefined
+		if (typeof index === 'object') index = undefined;
+
+		// ensure the date input cannot be set to a future date
+		const paymentDateInput = document.getElementById('payment-date');
+		paymentDateInput.max = getTodayISO();
+
+		if (typeof index === 'number' && Number.isInteger(index) && index >= 0 && index < appState.payments.length) {
+			// edit mode
+			const payment = appState.payments[index];
+			if (!payment) return;
+			document.getElementById('payment-amount').value = payment.amount;
+			document.getElementById('payment-date').value = payment.date;
+			paymentIndexEl.value = String(index);
+			modalTitleEl.textContent = 'Edit Payment';
+			modalSubmitBtn.textContent = 'Save Changes';
+		} else {
+			// add mode
+			paymentIndexEl.value = '';
+			document.getElementById('payment-amount').value = '';
+			document.getElementById('payment-date').valueAsDate = new Date();
+			modalTitleEl.textContent = 'Add New Payment';
+			modalSubmitBtn.textContent = 'Add Payment';
+		}
+
+		paymentModal.classList.remove('hidden');
+	}
+
+	// Hide payment modal
+	function hidePaymentModal() {
+		paymentModal.classList.add('hidden');
+		paymentForm.reset();
+		document.getElementById('payment-date').valueAsDate = new Date();
+		paymentIndexEl.value = '';
+	}
+
+	// Handle adding or editing a payment
+	function handleAddOrEditPayment(e) {
+		e.preventDefault();
+
+		const amount = parseInt(document.getElementById('payment-amount').value, 10);
+		const date = document.getElementById('payment-date').value;
+		const editIndex = paymentIndexEl.value !== '' ? parseInt(paymentIndexEl.value, 10) : null;
+
+		if (isNaN(amount) || amount <= 0) {
+			alert('Please enter a valid payment amount');
+			return;
+		}
+
+		if (editIndex !== null && Number.isInteger(editIndex)) {
+			appState.payments[editIndex] = { date, amount };
+		} else {
+			appState.payments.push({ date, amount });
+		}
+
+		saveUserData();
+		updateDashboard();
+		hidePaymentModal();
+
+		if (editIndex !== null) {
+			alert(`Payment updated to ${formatCurrency(amount)}`);
+		} else {
+			alert(`Payment of ${formatCurrency(amount)} recorded successfully!`);
+		}
+	}
+
+	// Export to CSV
+	function exportToCsv() {
+		if (!appState.payments || appState.payments.length === 0) {
+			alert('No payment data to export');
+			return;
+		}
+
+		let csvContent = "Date,Amount,Cumulative Total\n";
+		let cumulativeTotal = 0;
+
+		appState.payments.forEach(payment => {
+			cumulativeTotal += payment.amount;
+			csvContent += `${payment.date},${payment.amount},${cumulativeTotal}\n`;
+		});
+
+		const blob = new Blob([csvContent], { type: 'text/csv' });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = 'payment-history.csv';
+		document.body.appendChild(a);
+		a.click();
+		document.body.removeChild(a);
+		URL.revokeObjectURL(url);
+	}
+</script>
 </body>
 </html>
